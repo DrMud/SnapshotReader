@@ -1,5 +1,5 @@
 module snapshotreader3
-  ! read Gadget Format2 Snapshot
+  ! read Gadget Format2 Snapshot - e.g. for Dianoga simulations of Trieste
 
   ! STORE VARIABLES
   integer :: nparticles ! number of particles in snapshot
@@ -16,12 +16,8 @@ contains
 
   subroutine readHeader(snap,flag,z)
     !Read GADGET snapshot header only
-    !WARNING: snapshots made using Chris Power's ICs generator are 
-    !         different from the standard. These have box sizes and positions
-    !         in units of Mpc/h (CP's ICs) rather than kpc/h (standard)
-    !WARNING: Masses may also be in different units
-    !         Chris Power's ICs generator writes masses in units of 10**10*Msol/h
-    !         The standard units are....
+    !WARNING: non-standard snapshots have box sizes and positions
+    !         in units of Mpc/h (flag=1) rather than kpc/h (standard; flag=0)
     implicit none
     character(len=*),intent(in):: snap
     integer,intent(in) :: flag
@@ -52,12 +48,8 @@ contains
 
   subroutine readGADGET(snap,flag)
     ! read and store information on every particle in simulation
-    !WARNING: snapshots made using Chris Power's ICs generator are 
-    !         different from the standard. These have box sizes and positions
-    !         in units of Mpc/h (CP's ICs) rather than kpc/h (standard)
-    !WARNING: Masses may also be in different units
-    !         Chris Power's ICs generator writes masses in units of 10**10*Msol/h
-    !         The standard units are....
+    !WARNING: non-standard snapshots have box sizes and positions
+    !         in units of Mpc/h (flag=1) rather than kpc/h (standard; flag=0)
     implicit none
     integer,intent(in) :: flag
     character(len=*),intent(in)     :: snap
@@ -96,7 +88,7 @@ contains
     if(nMasses.gt.0)then
        allocate(masses(nMasses))
     end if
-    ! Positions are in Mpc/h (CP's ICs) or kpc/h (standard)
+    ! Positions are in Mpc/h (non-standard) or kpc/h (standard)
     read(45) blocklabel,blocksize
     write(*,*) blocklabel, blocksize
     read(45) (allPartCoords(i,1),allPartCoords(i,2),allPartCoords(i,3), i=1,nparticles)

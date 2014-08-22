@@ -1,61 +1,53 @@
-MODULE snapshotreader
+module snapshotreader
   ! read Gadget-format Snapshot
 
   ! STORE VARIABLES
-  INTEGER :: nparticles ! number of particles in snapshot
-  REAL*4, ALLOCATABLE :: allPartCoords(:,:) ! [xpos,ypos,zpos] for each particle (units Mpc/h)
-  REAL*4, ALLOCATABLE :: allPartMasses(:) ! masses for each particle (units Msol/h)
-  INTEGER, ALLOCATABLE :: allIDlist(:) ! ID's for each particle
-  REAL*8, SAVE :: BoxSize ! Mpc/h
-  REAL*8, SAVE :: OmegaM0,OmegaL0,hubb !dimensionless
-  REAL*8, SAVE :: massArr(6)    ! masses are in 10**10 Msol/h
+  integer :: nparticles ! number of particles in snapshot
+  real*4, allocatable :: allPartCoords(:,:) ! [xpos,ypos,zpos] for each particle (units Mpc/h)
+  real*4, allocatable :: allPartMasses(:) ! masses for each particle (units Msol/h)
+  integer, allocatable :: allIDlist(:) ! ID's for each particle
+  real*8, save :: BoxSize ! Mpc/h
+  real*8, save :: OmegaM0,OmegaL0,hubb !dimensionless
+  real*8, save :: massArr(6)    ! masses are in 10**10 Msol/h
 
 
-CONTAINS
+contains
 
-  SUBROUTINE readHeader(snap,flag,z)
+  subroutine readHeader(snap,flag,z)
     !Read GADGET snapshot header only
-    !WARNING: snapshots made using Chris Power's ICs generator are 
-    !         different from the standard. These have box sizes and positions
-    !         in units of Mpc/h (CP's ICs) rather than kpc/h (standard)
-    !WARNING: Masses may also be in different units
-    !         Chris Power's ICs generator writes masses in units of 10**10*Msol/h
-    !         The standard units are....
-    IMPLICIT NONE
-    CHARACTER(len=*),INTENT(IN):: snap
-    INTEGER,INTENT(IN) :: flag
-    REAL*4, INTENT(OUT) :: z
+    !WARNING: non-standard snapshots have box sizes and positions
+    !         in units of Mpc/h (flag=1) rather than kpc/h (standard; flag=0)
+    implicit none
+    character(len=*),intent(in):: snap
+    integer,intent(in) :: flag
+    real*4, intent(out) :: z
     real*8 :: dz !double precision version
-    REAL*8 :: dummyD
-    INTEGER :: dummyIa(10)
-    INTEGER :: narr(6)
-    OPEN(44, FILE=TRIM(snap),form='unformatted')
-    READ(44) narr,massArr,dummyD,dz,dummyIa,BoxSize,OmegaM0,OmegaL0,hubb
-    CLOSE(44)
-    SELECT CASE(flag)
-    CASE(0)
+    real*8 :: dummyD
+    integer :: dummyIa(10)
+    integer :: narr(6)
+    open(44, FILE=trim(snap),form='unformatted')
+    read(44) narr,massArr,dummyD,dz,dummyIa,BoxSize,OmegaM0,OmegaL0,hubb
+    close(44)
+    select case(flag)
+    case(0)
        BoxSize = BoxSize/1000. ! convert to Mpc/h
-    END SELECT
-    nparticles = SUM(narr)
+    end select
+    nparticles = sum(narr)
     z = real(dz)
-  END SUBROUTINE readHeader
+  end subroutine readHeader
 
 
 
-  SUBROUTINE readGADGET(snap,flag)
+  subroutine readGADGET(snap,flag)
     ! read and store information on every particle in simulation
-    !WARNING: snapshots made using Chris Power's ICs generator are 
-    !         different from the standard. These have box sizes and positions
-    !         in units of Mpc/h (CP's ICs) rather than kpc/h (standard)
-    !WARNING: Masses may also be in different units
-    !         Chris Power's ICs generator writes masses in units of 10**10*Msol/h
-    !         The standard units are....
-    IMPLICIT NONE
-    INTEGER,INTENT(IN) :: flag
-    CHARACTER(len=*),INTENT(IN)     :: snap
-    INTEGER             :: i,j,k
-    INTEGER             :: ntype(6), nMasses, ntypei
-    REAL*4, ALLOCATABLE :: masses(:)
+    !WARNING: non-standard snapshots have box sizes and positions
+    !         in units of Mpc/h (flag=1) rather than kpc/h (standard; flag=0)
+    implicit none
+    integer,intent(in) :: flag
+    character(len=*),intent(in)     :: snap
+    integer             :: i,j,k
+    integer             :: ntype(6), nMasses, ntypei
+    real*4, allocatable :: masses(:)
     logical :: fexist
     !check snapshot exists
     inquire(file=trim(snap) , exist=fexist)
@@ -63,70 +55,68 @@ CONTAINS
        write(*,*) 'Cannot find ',trim(snap)
        stop
     end if
-    WRITE(*,*) 'READING HEADER of ',trim(snap)
-    WRITE(*,*) '--------------------'
-1   FORMAT(I8,A,I1,T30,A,E12.5,A)
-    OPEN(45, FILE=TRIM(snap),form='unformatted')
-    READ(45) ntype
+    write(*,*) 'READING HEADER of ',trim(snap)
+    write(*,*) '--------------------'
+1   format(I8,A,I1,T30,A,E12.5,A)
+    open(45, FILE=trim(snap),form='unformatted')
+    read(45) ntype
     ! check number of particles!
-    IF(nparticles.NE.SUM(ntype)) STOP 'Confusion with # total particles'
+    if(nparticles.ne.sum(ntype)) stop 'Confusion with # total particles'
     ! Calculate number of particle masses listed in the 'masses' block
     nMasses = 0
-    DO i=0,5 ! particle type
-       WRITE(*,1) ntype(i+1),' particles of type ',i,': mass =',&
+    do i=0,5 ! particle type
+       write(*,1) ntype(i+1),' particles of type ',i,': mass =',&
             &     massArr(i+1)*1e10,' (Msol/h)'
-       IF(massArr(i+1).EQ.0)THEN !if mass varies for this type
+       if(massArr(i+1).eq.0)then !if mass varies for this type
           nMasses = nMasses + ntype(i+1)
-       END IF
-    END DO
-    WRITE(*,*) 'number of particles listed in mass block =',nMasses
-    WRITE(*,*)
-    IF(nMasses.GT.0)THEN
-       ALLOCATE(masses(nMasses))
-    END IF
-    ! Positions are in Mpc/h (CP's ICs) or kpc/h (standard)
-    READ(45) (allPartCoords(i,1),allPartCoords(i,2),allPartCoords(i,3), i=1,nparticles)
-    SELECT CASE(flag)
-    CASE(0)
+       end if
+    end do
+    write(*,*) 'number of particles listed in mass block =',nMasses
+    write(*,*)
+    if(nMasses.gt.0)then
+       allocate(masses(nMasses))
+    end if
+    ! Positions are in Mpc/h (non-standard) or kpc/h (standard)
+    read(45) (allPartCoords(i,1),allPartCoords(i,2),allPartCoords(i,3), i=1,nparticles)
+    select case(flag)
+    case(0)
        allPartCoords(:,1:3) = allPartCoords(:,1:3)/1000. ! convert to Mpc/h
-    END SELECT
-    write(*,*) 'Maximum position : ',maxval(allPartCoords)
-    write(*,*) 'Minimum position : ',minval(allPartCoords)
-    READ(45) ! no need to read in velocities
-    READ(45) allIDlist
-    IF(nMasses.GT.0)THEN
-       READ(45) (masses(i), i=1,nMasses)
-    END IF
-    CLOSE(45)
+    end select
+    read(45) ! no need to read in velocities
+    read(45) allIDlist
+    if(nMasses.gt.0)then
+       read(45) (masses(i), i=1,nMasses)
+    end if
+    close(45)
     k=0 ! count through each particle in simulation
     j=0 ! count through particle masses listed in 'masses' block
-    DO i=0,5 ! particle type
+    do i=0,5 ! particle type
        ntypei = ntype(i+1) ! number of particles of that type
-       IF(ntypei.GT.0)THEN
-          IF(massArr(i+1).GT.0.) THEN ! all particles this mass
-             allPartMasses(k+1:k+ntypei) = REAL(massArr(i+1))
-             WRITE(*,*) 'particles of type',i,'have the same mass'
-          ELSE ! particles of varying masses
-             WRITE(*,*) 'particles of type',i,'have varying mass'
+       if(ntypei.gt.0)then
+          if(massArr(i+1).gt.0.) then ! all particles this mass
+             allPartMasses(k+1:k+ntypei) = real(massArr(i+1))
+             write(*,*) 'particles of type',i,'have the same mass'
+          else ! particles of varying masses
+             write(*,*) 'particles of type',i,'have varying mass'
              allPartMasses(k+1:k+ntypei) = masses(j+1:j+ntypei)
              j = j + ntypei
-          END IF
+          end if
           k = k + ntypei
-       END IF
-    END DO
+       end if
+    end do
     !WARNING: masses are in 10**10 Msol/h (standard)
     !convert masses to units Msol/h
     allPartMasses = allPartMasses * 1e10
     write(*,*) 'most massive particle (Msol/h) = ',maxval(allPartMasses)
-    IF(ALLOCATED(masses))THEN
-       DEALLOCATE(masses)
-    END IF
-    WRITE(*,*)
-    IF (.NOT.(k.EQ.nparticles)) STOP 'how many particles have been included?'
-    IF (.NOT.(j.EQ.nmasses)) STOP 'how many particles have masses included?'
+    if(allocated(masses))then
+       deallocate(masses)
+    end if
+    write(*,*)
+    if (.not.(k.eq.nparticles)) stop 'how many particles have been included?'
+    if (.not.(j.eq.nmasses)) stop 'how many particles have masses included?'
     write(*,*) 'Finished reading information from GADGET file'
-  END SUBROUTINE readGADGET
+  end subroutine readGADGET
 
 
 
-END MODULE snapshotreader
+end module snapshotreader

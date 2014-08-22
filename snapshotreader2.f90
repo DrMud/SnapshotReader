@@ -15,12 +15,8 @@ contains
 
   subroutine readHeader(snap,flag,z)
     !Read GADGET snapshot header only
-    !WARNING: snapshots made using Chris Power's ICs generator are 
-    !         different from the standard. These have box sizes and positions
-    !         in units of Mpc/h (CP's ICs) rather than kpc/h (standard)
-    !WARNING: Masses may also be in different units
-    !         Chris Power's ICs generator writes masses in units of 10**10*Msol/h
-    !         The standard units are....
+    !WARNING: non-standard snapshots have box sizes and positions
+    !         in units of Mpc/h (flag=1) rather than kpc/h (standard; flag=0)
     implicit none
     character(len=*),intent(in):: snap
     integer,intent(in) :: flag
@@ -36,10 +32,8 @@ contains
     open(44, FILE=trim(snap),form='unformatted')
     read(44) blocklabel,blocksize
     write(*,*) blocklabel, blocksize
-    call flush(6)
     read(44) narr,massArr,dummyD,dz,dummyIa,BoxSize,OmegaM0,OmegaL0,hubb
     write(*,*) narr,massArr,dummyD,dz,dummyIa,BoxSize,OmegaM0,OmegaL0,hubb
-    call flush(6)
     close(44)
     select case(flag)
     case(0)
@@ -48,19 +42,14 @@ contains
     nparticles = sum(narr)
     z = real(dz)
     write(*,*) BoxSize, nparticles, z
-    call flush(6)
   end subroutine readHeader
 
 
 
   subroutine readGADGET(snap,flag)
     ! read and store information on every particle in simulation
-    !WARNING: snapshots made using Chris Power's ICs generator are 
-    !         different from the standard. These have box sizes and positions
-    !         in units of Mpc/h (CP's ICs) rather than kpc/h (standard)
-    !WARNING: Masses may also be in different units
-    !         Chris Power's ICs generator writes masses in units of 10**10*Msol/h
-    !         The standard units are....
+    !WARNING: non-standard snapshots have box sizes and positions
+    !         in units of Mpc/h (flag=1) rather than kpc/h (standard; flag=0)
     implicit none
     integer,intent(in) :: flag
     character(len=*),intent(in)     :: snap
@@ -82,7 +71,6 @@ contains
     open(45, FILE=trim(snap),form='unformatted')
     read(45) blocklabel,blocksize
     write(*,*) blocklabel, blocksize
-    call flush(6)
     read(45) ntype
     ! check number of particles!
     if(nparticles.ne.sum(ntype)) stop 'Confusion with # total particles'
@@ -91,21 +79,18 @@ contains
     do i=0,5 ! particle type
        write(*,1) ntype(i+1),' particles of type ',i,': mass =',&
             &     massArr(i+1)*1e10,' (Msol/h)'
-       call flush(6)
        if(massArr(i+1).eq.0)then !if mass varies for this type
           nMasses = nMasses + ntype(i+1)
        end if
     end do
     write(*,*) 'number of particles listed in mass block =',nMasses
     write(*,*)
-    call flush(6)
     if(nMasses.gt.0)then
        allocate(masses(nMasses))
     end if
-    ! Positions are in Mpc/h (CP's ICs) or kpc/h (standard)
+    ! Positions are in Mpc/h (non-standard) or kpc/h (standard)
     read(45) blocklabel,blocksize
     write(*,*) blocklabel, blocksize
-    call flush(6)
     read(45) (allPartCoords(i,1),allPartCoords(i,2),allPartCoords(i,3), i=1,nparticles)
     select case(flag)
     case(0)
@@ -113,16 +98,13 @@ contains
     end select
     read(45) blocklabel,blocksize
     write(*,*) blocklabel, blocksize
-    call flush(6)
     read(45) ! no need to read in velocities
     read(45) blocklabel,blocksize
     write(*,*) blocklabel, blocksize
-    call flush(6)
     read(45) allIDlist
     if(nMasses.gt.0)then
        read(45) blocklabel,blocksize
        write(*,*) blocklabel, blocksize
-       call flush(6)
        read(45) (masses(i), i=1,nMasses)
     end if
     write(*,*) 'most massive particle IN BLOCK (Msol/h) = ',maxval(masses)*1d10
